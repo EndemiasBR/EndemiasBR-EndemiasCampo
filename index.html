@@ -25,6 +25,9 @@
     .pendente { color: #9a6b00; font-weight: 700; }
     .enviado { color: #006B3F; font-weight: 700; }
     .hide { display: none; }
+    .sug { border: 1px solid #b7d9c2; border-radius: 8px; max-height: 220px; overflow: auto; background: #fff; }
+    .sug div { padding: 10px; border-bottom: 1px solid #eef6f0; }
+    .sug div:active, .sug div:hover { background: #e8f7ee; }
   </style>
 </head>
 <body>
@@ -113,23 +116,50 @@
       if (r2.ok) localStorage.setItem(CACHE_LOC, JSON.stringify(await r2.json()));
     }
 
-    function optionsMun(selId) {
-      const mun = lerJson(CACHE_MUN);
-      return `<option value="">Selecione o município</option>` +
-        mun.map(m => `<option value="${m.id}" ${String(m.id)===String(selId)?"selected":""}>${m.nome}</option>`).join("");
-    }
-    function optionsLoc(munId, selId) {
-      const locs = lerJson(CACHE_LOC).filter(l => !munId || String(l.municipio_id) === String(munId));
-      return `<option value="">Selecione a localidade</option>` +
-        locs.map(l => `<option value="${l.id}" ${String(l.id)===String(selId)?"selected":""}>${l.nome}</option>`).join("");
-    }
     function nomePorId(lista, id) {
       const x = lista.find(i => String(i.id) === String(id));
       return x ? x.nome : "";
     }
-    function atualizarLocs() {
-      const mid = document.getElementById("municipio_id").value;
-      document.getElementById("localidade_id").innerHTML = optionsLoc(mid, "");
+    function normaliza(s) {
+      return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+    function htmlBusca(tipo) {
+      const ph = tipo === "mun" ? "Digite o município" : "Digite a localidade";
+      return `<input id="${tipo}_busca" placeholder="${ph}" autocomplete="off" oninput="filtrarBusca('${tipo}')">
+        <input type="hidden" id="${tipo === "mun" ? "municipio_id" : "localidade_id"}">
+        <div id="${tipo}_sug" class="sug hide"></div>`;
+    }
+    function filtrarBusca(tipo) {
+      const q = normaliza(document.getElementById(tipo + "_busca").value);
+      const box = document.getElementById(tipo + "_sug");
+      if (tipo === "mun") document.getElementById("municipio_id").value = "";
+      else document.getElementById("localidade_id").value = "";
+      if (q.length < 2) { box.classList.add("hide"); box.innerHTML = ""; return; }
+      let itens = [];
+      if (tipo === "mun") {
+        itens = lerJson(CACHE_MUN).filter(m => normaliza(m.nome).includes(q)).slice(0, 30);
+      } else {
+        const mid = document.getElementById("municipio_id").value;
+        itens = lerJson(CACHE_LOC).filter(l =>
+          (!mid || String(l.municipio_id) === String(mid)) && normaliza(l.nome).includes(q)
+        ).slice(0, 30);
+      }
+      if (!itens.length) { box.classList.remove("hide"); box.innerHTML = "<div>Nenhum resultado</div>"; return; }
+      box.classList.remove("hide");
+      box.innerHTML = itens.map(i =>
+        `<div onclick="escolherBusca('${tipo}', '${i.id}', \`${String(i.nome).replace(/`/g, "")}\`)">${i.nome}</div>`
+      ).join("");
+    }
+    function escolherBusca(tipo, id, nome) {
+      document.getElementById(tipo + "_busca").value = nome;
+      document.getElementById(tipo + "_sug").classList.add("hide");
+      if (tipo === "mun") {
+        document.getElementById("municipio_id").value = id;
+        document.getElementById("loc_busca").value = "";
+        document.getElementById("localidade_id").value = "";
+      } else {
+        document.getElementById("localidade_id").value = id;
+      }
     }
 
     function mostrarSo(id) {
@@ -164,8 +194,8 @@
     function htmlGenerica(programa, ficha) {
       return `
         <label>Data</label><input type="date" id="data">
-        <label>Município</label><select id="municipio_id" onchange="atualizarLocs()">${optionsMun("")}</select>
-        <label>Localidade</label><select id="localidade_id">${optionsLoc("", "")}</select>
+        <label>Município</label>${htmlBusca("mun")}
+        <label>Localidade</label>${htmlBusca("loc")}
         <label>Observações</label><textarea id="obs" rows="3"></textarea>
         <button onclick="salvarGenerica()">Salvar ${ficha}</button>
         <p style="font-size:13px;color:#555">Ficha de ${programa}. Destino oficial desta atividade entra na sequência.</p>`;
@@ -174,8 +204,8 @@
     function htmlDiario() {
       return `
         <label>Data da atividade</label><input type="date" id="data">
-        <label>Município</label><select id="municipio_id" onchange="atualizarLocs()">${optionsMun("")}</select>
-        <label>Localidade</label><select id="localidade_id">${optionsLoc("", "")}</select>
+        <label>Município</label>${htmlBusca("mun")}
+        <label>Localidade</label>${htmlBusca("loc")}
         <label>Categoria</label><select id="categoria"><option>Urbana</option><option>Rural</option></select>
         <label>Quarteirão</label><input id="quarteirao">
         <label>Casa</label><input id="casa">
@@ -332,5 +362,3 @@
   </script>
 </body>
 </html>
-
-
