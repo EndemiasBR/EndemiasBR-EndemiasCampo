@@ -1,4 +1,4 @@
-const CACHE = "endemiascampo-v2";
+const CACHE = "endemiascampo-v6";
 const ARQUIVOS = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", (e) => {
