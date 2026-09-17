@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EndemiasCampo</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#006B3F">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <style>
     body { margin: 0; font-family: Arial, sans-serif; background: #f0fff4; }
     header {
@@ -157,12 +160,12 @@
     }
 
     async function sincronizar(avisar) {
-      if (SUPABASE_KEY.indexOf("COLE_AQUI") >= 0) {
-        alert("Cole a Publishable key no index.html antes de sincronizar.");
+      if (!SUPABASE_KEY || SUPABASE_KEY.indexOf("COLE_AQUI") >= 0) {
+        alert("Cole a chave pública no index.html antes de sincronizar.");
         return;
       }
       if (!online()) {
-        if (avisar) alert("Sem internet agora.");
+        if (avisar) alert("Sem internet agora. Os registros ficam neste aparelho.");
         return;
       }
       const dados = ler();
@@ -198,6 +201,12 @@
     });
     window.addEventListener("offline", mostrarRede);
     if (online()) sincronizar(false);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js");
+    }
   </script>
 </body>
 </html>
+
+
+
