@@ -66,6 +66,8 @@
     const CHAVE = "endemiascampo_diario";
     const CACHE_MUN = "endemiascampo_municipios";
     const CACHE_LOC = "endemiascampo_localidades";
+    const CACHE_EST = "endemiascampo_estados";
+    const CACHE_REG = "endemiascampo_regionais";
     const SUPABASE_URL = "https://gwperarqwoflsmowaxgs.supabase.co";
     const SUPABASE_KEY = "sb_publishable_L66WTnc3iZYDb1TTmcHg0A_o-2Ec8Fm";
     let programaAtual = "";
@@ -110,8 +112,19 @@
     async function baixarListas() {
       if (!online() || !SUPABASE_KEY || SUPABASE_KEY.indexOf("COLE_AQUI") >= 0) return;
       const h = headers();
-      const r1 = await fetch(SUPABASE_URL + "/rest/v1/municipios?select=id,nome&order=nome", { headers: h });
-      if (r1.ok) localStorage.setItem(CACHE_MUN, JSON.stringify(await r1.json()));
+      const r0 = await fetch(SUPABASE_URL + "/rest/v1/estados?select=id,nome,sigla&order=nome", { headers: h });
+      if (r0.ok) localStorage.setItem(CACHE_EST, JSON.stringify(await r0.json()));
+      const rR = await fetch(SUPABASE_URL + "/rest/v1/regionais_saude?select=id,estado_id", { headers: h });
+      if (rR.ok) localStorage.setItem(CACHE_REG, JSON.stringify(await rR.json()));
+      const r1 = await fetch(SUPABASE_URL + "/rest/v1/municipios?select=id,nome,regional_id&order=nome", { headers: h });
+      if (r1.ok) {
+        const regs = lerJson(CACHE_REG);
+        const mapa = {};
+        regs.forEach(r => { mapa[r.id] = r.estado_id; });
+        const mun = await r1.json();
+        mun.forEach(m => { m.estado_id = mapa[m.regional_id] || null; });
+        localStorage.setItem(CACHE_MUN, JSON.stringify(mun));
+      }
       const r2 = await fetch(SUPABASE_URL + "/rest/v1/localidades?select=id,nome,municipio_id&order=nome", { headers: h });
       if (r2.ok) localStorage.setItem(CACHE_LOC, JSON.stringify(await r2.json()));
     }
@@ -123,11 +136,27 @@
     function normaliza(s) {
       return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     }
+    function htmlEstado() {
+      const est = lerJson(CACHE_EST);
+      return `<label>Estado</label>
+        <select id="estado_id" onchange="aoMudarEstado()">
+          <option value="">Selecione o estado</option>
+          ${est.map(e => `<option value="${e.id}">${e.sigla || ""} — ${e.nome}</option>`).join("")}
+        </select>`;
+    }
     function htmlBusca(tipo) {
       const ph = tipo === "mun" ? "Digite o município" : "Digite a localidade";
       return `<input id="${tipo}_busca" placeholder="${ph}" autocomplete="off" oninput="filtrarBusca('${tipo}')">
         <input type="hidden" id="${tipo === "mun" ? "municipio_id" : "localidade_id"}">
         <div id="${tipo}_sug" class="sug hide"></div>`;
+    }
+    function aoMudarEstado() {
+      document.getElementById("mun_busca").value = "";
+      document.getElementById("municipio_id").value = "";
+      document.getElementById("loc_busca").value = "";
+      document.getElementById("localidade_id").value = "";
+      document.getElementById("mun_sug").classList.add("hide");
+      document.getElementById("loc_sug").classList.add("hide");
     }
     function filtrarBusca(tipo) {
       const q = normaliza(document.getElementById(tipo + "_busca").value);
@@ -137,7 +166,11 @@
       if (q.length < 2) { box.classList.add("hide"); box.innerHTML = ""; return; }
       let itens = [];
       if (tipo === "mun") {
-        itens = lerJson(CACHE_MUN).filter(m => normaliza(m.nome).includes(q)).slice(0, 30);
+        const eid = document.getElementById("estado_id") ? document.getElementById("estado_id").value : "";
+        if (!eid) { box.classList.remove("hide"); box.innerHTML = "<div>Selecione o estado primeiro</div>"; return; }
+        itens = lerJson(CACHE_MUN).filter(m =>
+          String(m.estado_id) === String(eid) && normaliza(m.nome).includes(q)
+        ).slice(0, 30);
       } else {
         const mid = document.getElementById("municipio_id").value;
         itens = lerJson(CACHE_LOC).filter(l =>
@@ -194,6 +227,7 @@
     function htmlGenerica(programa, ficha) {
       return `
         <label>Data</label><input type="date" id="data">
+        ${htmlEstado()}
         <label>Município</label>${htmlBusca("mun")}
         <label>Localidade</label>${htmlBusca("loc")}
         <label>Observações</label><textarea id="obs" rows="3"></textarea>
@@ -204,6 +238,7 @@
     function htmlDiario() {
       return `
         <label>Data da atividade</label><input type="date" id="data">
+        ${htmlEstado()}
         <label>Município</label>${htmlBusca("mun")}
         <label>Localidade</label>${htmlBusca("loc")}
         <label>Categoria</label><select id="categoria"><option>Urbana</option><option>Rural</option></select>
