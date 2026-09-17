@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EndemiasCampo</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #f0fff4; }
+    header {
+      background: linear-gradient(135deg, #006B3F, #009C3B);
+      color: white; padding: 18px 16px; border-bottom: 6px solid #FFD700;
+    }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 6px 0 0 0; color: #FFD700; font-size: 14px; }
+    main { padding: 16px; max-width: 720px; margin: 0 auto; }
+    .card {
+      background: white; border: 1px solid #c8e6d0;
+      border-radius: 12px; padding: 16px; margin-bottom: 16px;
+    }
+    label { display: block; font-weight: 700; color: #006B3F; margin: 10px 0 4px; }
+    input, select, textarea {
+      width: 100%; box-sizing: border-box; padding: 10px;
+      border: 1px solid #b7d9c2; border-radius: 8px; font-size: 16px;
+    }
+    button {
+      width: 100%; margin-top: 14px; height: 46px; border: 0;
+      border-radius: 9px; background: #008f36; color: white;
+      font-weight: 700; font-size: 16px;
+    }
+    .item { border-top: 1px solid #e0eee4; padding: 10px 0; font-size: 14px; }
+    .pendente { color: #9a6b00; font-weight: 700; }
+    .enviado { color: #006B3F; font-weight: 700; }
+    .status { font-size: 13px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>EndemiasCampo</h1>
+    <p>Diário PCDCh — envio automático com sinal</p>
+  </header>
+  <main>
+    <div class="card">
+      <div id="rede" class="status">Verificando rede...</div>
+      <label>Data</label>
+      <input type="date" id="data">
+      <label>Município</label>
+      <input type="text" id="municipio" placeholder="Nome do município">
+      <label>Localidade</label>
+      <input type="text" id="localidade" placeholder="Nome da localidade">
+      <label>Atividade</label>
+      <select id="atividade">
+        <option value="">Selecione...</option>
+        <option>Pesquisa entomológica</option>
+        <option>Pulverização</option>
+        <option>Captura</option>
+        <option>Notificação</option>
+        <option>Educação em saúde</option>
+        <option>Outra</option>
+      </select>
+      <label>Observações</label>
+      <textarea id="obs" rows="3"></textarea>
+      <button onclick="salvar()">Salvar no aparelho</button>
+    </div>
+    <div class="card">
+      <strong>Registros neste aparelho</strong>
+      <div id="lista"></div>
+      <button onclick="sincronizar(true)">Sincronizar agora</button>
+    </div>
+  </main>
+  <script>
+    const CHAVE = "endemiascampo_diario";
+    const SUPABASE_URL = "https://gwperarqwoflsmowaxgs.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_L66WTnc3iZYDb1TTmcHg0A_o-2Ec8Fm";
+
+    function online() { return navigator.onLine; }
+
+    function mostrarRede() {
+      document.getElementById("rede").textContent = online()
+        ? "Com sinal — pendentes serão enviados."
+        : "Sem sinal — salvando só neste aparelho.";
+    }
+
+    function ler() {
+      try { return JSON.parse(localStorage.getItem(CHAVE) || "[]"); }
+      catch { return []; }
+    }
+
+    function gravar(dados) {
+      localStorage.setItem(CHAVE, JSON.stringify(dados));
+    }
+
+    function mostrar() {
+      const lista = document.getElementById("lista");
+      const dados = ler();
+      if (!dados.length) {
+        lista.innerHTML = "<p>Nenhum registro ainda.</p>";
+        return;
+      }
+      lista.innerHTML = dados.map(r =>
+        `<div class="item">
+           <div>${r.data} — ${r.municipio} / ${r.localidade || "-"}</div>
+           <div>${r.atividade}</div>
+           <div class="${r.status === "enviado" ? "enviado" : "pendente"}">
+             ${r.status === "enviado" ? "Enviado ao banco" : "Pendente de sincronizar"}
+           </div>
+         </div>`
+      ).join("");
+    }
+
+    function salvar() {
+      const registro = {
+        id: Date.now(),
+        data: document.getElementById("data").value,
+        municipio: document.getElementById("municipio").value.trim(),
+        localidade: document.getElementById("localidade").value.trim(),
+        atividade: document.getElementById("atividade").value,
+        obs: document.getElementById("obs").value.trim(),
+        status: "pendente"
+      };
+      if (!registro.data || !registro.municipio || !registro.atividade) {
+        alert("Preencha data, município e atividade.");
+        return;
+      }
+      const dados = ler();
+      dados.unshift(registro);
+      gravar(dados);
+      document.getElementById("localidade").value = "";
+      document.getElementById("obs").value = "";
+      mostrar();
+      if (online()) sincronizar(false);
+      else alert("Salvo neste aparelho. Envia quando o sinal voltar.");
+    }
+
+    async function enviarUm(r) {
+      const resp = await fetch(SUPABASE_URL + "/rest/v1/endemiascampo_diario", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + SUPABASE_KEY,
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          origem_id: r.id,
+          data: r.data || null,
+          municipio: r.municipio || null,
+          localidade: r.localidade || null,
+          atividade: r.atividade || null,
+          observacao: r.obs || null,
+          status: "importado"
+        })
+      });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(txt || ("HTTP " + resp.status));
+      }
+    }
+
+    async function sincronizar(avisar) {
+      if (SUPABASE_KEY.indexOf("COLE_AQUI") >= 0) {
+        alert("Cole a Publishable key no index.html antes de sincronizar.");
+        return;
+      }
+      if (!online()) {
+        if (avisar) alert("Sem internet agora.");
+        return;
+      }
+      const dados = ler();
+      const pendentes = dados.filter(r => r.status === "pendente");
+      if (!pendentes.length) {
+        if (avisar) alert("Não há pendentes.");
+        return;
+      }
+      let ok = 0;
+      let erro = "";
+      for (const r of pendentes) {
+        try {
+          await enviarUm(r);
+          r.status = "enviado";
+          ok += 1;
+        } catch (e) {
+          erro = String(e.message || e);
+          break;
+        }
+      }
+      gravar(dados);
+      mostrar();
+      if (erro) alert("Falha ao enviar: " + erro);
+      else if (avisar || ok) alert(ok + " registro(s) enviado(s) ao banco.");
+    }
+
+    document.getElementById("data").value = new Date().toISOString().slice(0, 10);
+    mostrarRede();
+    mostrar();
+    window.addEventListener("online", function () {
+      mostrarRede();
+      sincronizar(false);
+    });
+    window.addEventListener("offline", mostrarRede);
+    if (online()) sincronizar(false);
+  </script>
+</body>
+</html>
