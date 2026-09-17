@@ -77,7 +77,35 @@
       SISLOC: ["Localidade", "Imóvel"],
       PCDCh: ["Diário PCDCh", "Imóvel / vistoria", "Pesquisa entomológica", "Captura", "Triatomíneo", "Exame", "PIT", "Notificação", "Educação em saúde"],
       PCE: ["Coleção hídrica", "Pesquisa malacológica", "PCE-101", "PCE-108 / exame", "Educação em saúde", "Saneamento"],
-      PCL: ["Caso humano", "Investigação", "Entomologia", "Inquérito canino", "Ação / pulverização", "Óbito", "Educação em saúde"]
+      PCL: ["Caso humano LT", "Caso humano LV", "Investigação LT", "Investigação LV", "Entomologia LT", "Entomologia LV", "Inquérito canino", "Ação LT", "Ação LV", "Óbito LV", "Educação em saúde"]
+    };
+
+    const CAMPOS = {
+      "Localidade": [["tipo_localidade","Tipo","select","Povoado|Vila|Bairro|Rural"],["nome_localidade","Nome da localidade","text"]],
+      "Imóvel": [["endereco","Endereço / rua","text"],["numero","Número","text"],["tipo_imovel","Tipo do imóvel","select","Residência|Comércio|Anexo|Terreno|Outro"],["situacao_imovel","Situação","select","Ocupado|Fechado|Desabitado|Recusa"]],
+      "Imóvel / vistoria": [["endereco","Endereço / rua","text"],["numero","Número","text"],["situacao_imovel","Situação","select","Ocupado|Fechado|Desabitado|Recusa"],["tipo_parede","Parede","text"],["tipo_teto","Teto","text"]],
+      "Pesquisa entomológica": [["ambiente","Ambiente","select","Intra|Peri|Ambos"],["metodo","Método","text"],["resultado","Resultado","select","Negativa|Positiva"],["quantidade","Quantidade","number"]],
+      "Captura": [["ambiente","Ambiente","select","Intra|Peri"],["especie","Espécie","text"],["quantidade","Quantidade","number"]],
+      "Triatomíneo": [["especie","Espécie","text"],["estadio","Estádio","text"],["quantidade","Quantidade","number"]],
+      "Exame": [["tipo_exame","Tipo de exame","text"],["resultado","Resultado","select","Reagente|Não reagente|Pendente"]],
+      "PIT": [["num_pit","Número do PIT","text"],["nome_pit","Nome do PIT","text"]],
+      "Notificação": [["nome_caso","Nome","text"],["idade","Idade","number"],["sexo","Sexo","select","M|F"]],
+      "Educação em saúde": [["tema","Tema","text"],["publico","Público","text"],["participantes","Participantes","number"]],
+      "Coleção hídrica": [["tipo_criadouro","Tipo de coleção","text"],["resultado","Resultado","select","Negativa|Positiva"]],
+      "Pesquisa malacológica": [["especie","Espécie","text"],["quantidade","Quantidade","number"]],
+      "PCE-101": [["identificacao","Identificação da amostra","text"],["resultado","Resultado","text"]],
+      "PCE-108 / exame": [["nome_caso","Nome","text"],["exame","Exame","text"],["resultado","Resultado","text"]],
+      "Saneamento": [["tipo_acao","Tipo de ação","text"],["qtde","Quantidade","number"]],
+      "Caso humano LT": [["nome_caso","Nome","text"],["forma","Forma clínica","text"]],
+      "Caso humano LV": [["nome_caso","Nome","text"],["forma","Forma clínica","text"]],
+      "Investigação LT": [["data_sintomas","Início dos sintomas","date"],["conclusao","Conclusão","text"]],
+      "Investigação LV": [["data_sintomas","Início dos sintomas","date"],["conclusao","Conclusão","text"]],
+      "Entomologia LT": [["ponto","Ponto","text"],["resultado","Resultado","select","Negativa|Positiva"]],
+      "Entomologia LV": [["ponto","Ponto","text"],["resultado","Resultado","select","Negativa|Positiva"]],
+      "Inquérito canino": [["identificacao_cao","Cão / tutor","text"],["resultado","Resultado","select","Negativo|Positivo|Pendente"]],
+      "Ação LT": [["tipo_acao","Tipo de ação","text"],["produto","Produto","text"]],
+      "Ação LV": [["tipo_acao","Tipo de ação","text"],["produto","Produto","text"]],
+      "Óbito LV": [["nome_caso","Nome","text"],["data_obito","Data do óbito","date"]]
     };
 
     function headers() {
@@ -218,21 +246,32 @@
     function abrirFicha(programa, ficha) {
       programaAtual = programa; fichaAtual = ficha;
       document.getElementById("subtitulo").textContent = programa + " — " + ficha;
-      document.getElementById("corpo-ficha").innerHTML = ficha === "Diário PCDCh" ? htmlDiario() : htmlGenerica(programa, ficha);
+      document.getElementById("corpo-ficha").innerHTML = ficha === "Diário PCDCh" ? htmlDiario() : htmlFicha(programa, ficha);
       const dt = document.getElementById("data");
       if (dt) dt.value = new Date().toISOString().slice(0, 10);
       mostrarSo("tela-ficha");
     }
 
-    function htmlGenerica(programa, ficha) {
+    function htmlCampo(def) {
+      const [id, rotulo, tipo, opcoes] = def;
+      if (tipo === "select") {
+        const ops = (opcoes || "").split("|").map(o => `<option>${o}</option>`).join("");
+        return `<label>${rotulo}</label><select id="c_${id}">${ops}</select>`;
+      }
+      if (tipo === "number") return `<label>${rotulo}</label><input id="c_${id}" type="number" value="0">`;
+      if (tipo === "date") return `<label>${rotulo}</label><input id="c_${id}" type="date">`;
+      return `<label>${rotulo}</label><input id="c_${id}" type="text">`;
+    }
+    function htmlFicha(programa, ficha) {
+      const extras = (CAMPOS[ficha] || []).map(htmlCampo).join("");
       return `
         <label>Data</label><input type="date" id="data">
         ${htmlEstado()}
         <label>Município</label>${htmlBusca("mun")}
         <label>Localidade</label>${htmlBusca("loc")}
+        ${extras}
         <label>Observações</label><textarea id="obs" rows="3"></textarea>
-        <button onclick="salvarGenerica()">Salvar ${ficha}</button>
-        <p style="font-size:13px;color:#555">Ficha de ${programa}. Destino oficial desta atividade entra na sequência.</p>`;
+        <button onclick="salvarFicha()">Salvar ${ficha}</button>`;
     }
 
     function htmlDiario() {
@@ -283,15 +322,27 @@
       irHome();
     }
 
-    function salvarGenerica() {
+    function lerExtras() {
+      const extras = {};
+      (CAMPOS[fichaAtual] || []).forEach(def => {
+        extras[def[0]] = val("c_" + def[0]);
+      });
+      return extras;
+    }
+    function salvarFicha() {
+      const extras = lerExtras();
+      const detalhe = Object.keys(extras).filter(k => extras[k]).map(k => k + ": " + extras[k]).join(" | ");
       salvarRegistro({
         id: Date.now(), programa: programaAtual, atividade: fichaAtual,
         data: val("data"),
         municipio_id: val("municipio_id"),
         localidade_id: val("localidade_id"),
+        estado_id: val("estado_id"),
         municipio: nomePorId(lerJson(CACHE_MUN), val("municipio_id")),
         localidade: nomePorId(lerJson(CACHE_LOC), val("localidade_id")),
-        obs: val("obs"), status: "pendente"
+        extras: extras,
+        obs: [val("obs"), detalhe].filter(Boolean).join(" — "),
+        status: "pendente"
       });
     }
 
@@ -304,6 +355,7 @@
         data: val("data"),
         municipio_id: val("municipio_id"),
         localidade_id: val("localidade_id"),
+        estado_id: val("estado_id"),
         municipio: nomePorId(lerJson(CACHE_MUN), val("municipio_id")),
         localidade: nomePorId(lerJson(CACHE_LOC), val("localidade_id")),
         categoria: val("categoria"), quarteirao: val("quarteirao"), casa: val("casa"),
@@ -329,38 +381,148 @@
       if (!resp.ok) throw new Error(await resp.text() || ("HTTP " + resp.status));
     }
 
-    async function enviarUm(r) {
-      if (r.atividade === "Diário PCDCh" && r.municipio_id) {
+    function n(v) { const x = Number(v); return v === "" || v == null || isNaN(x) ? null : x; }
+    function x(r) { return r.extras || {}; }
+
+    async function enviarOficial(r) {
+      const mid = n(r.municipio_id);
+      const lid = n(r.localidade_id);
+      const eid = n(r.estado_id);
+      const e = x(r);
+      const a = r.atividade;
+      if (a === "Diário PCDCh" && mid) {
         await postJson("diario_pcdch", {
-          data_atividade: r.data || null,
-          municipio_id: Number(r.municipio_id),
-          localidade_id: r.localidade_id ? Number(r.localidade_id) : null,
-          categoria: r.categoria || null,
-          quarteirao: r.quarteirao || null,
-          casa: r.casa || null,
-          complemento: r.complemento || null,
-          morador_colaborador: r.morador || null,
-          habitantes: r.habitantes || 0,
-          anexos: r.anexos || 0,
-          tipo_parede: r.tipo_parede || null,
-          tipo_teto: r.tipo_teto || null,
+          data_atividade: r.data || null, municipio_id: mid, localidade_id: lid,
+          categoria: r.categoria || null, quarteirao: r.quarteirao || null, casa: r.casa || null,
+          complemento: r.complemento || null, morador_colaborador: r.morador || null,
+          habitantes: r.habitantes || 0, anexos: r.anexos || 0,
+          tipo_parede: r.tipo_parede || null, tipo_teto: r.tipo_teto || null,
           situacao_imovel: r.situacao_imovel || null,
-          faz_pesquisa: !!r.faz_pesquisa,
-          faz_borrifacao: !!r.faz_borrifacao,
-          faz_pit: !!r.faz_pit,
-          captura_intra: !!r.captura_intra,
-          vestigios_intra: !!r.vestigios_intra,
-          captura_peri: !!r.captura_peri,
-          vestigios_peri: !!r.vestigios_peri,
-          inseticida: r.inseticida || null,
-          qtde_inseticida: r.qtde_inseticida || 0,
-          num_pit: r.num_pit || null,
-          notificacao: r.notificacao || null,
-          agente_saude: r.agente_saude || null,
-          etiqueta: r.etiqueta || null,
-          status: "Ativo"
+          faz_pesquisa: !!r.faz_pesquisa, faz_borrifacao: !!r.faz_borrifacao, faz_pit: !!r.faz_pit,
+          captura_intra: !!r.captura_intra, vestigios_intra: !!r.vestigios_intra,
+          captura_peri: !!r.captura_peri, vestigios_peri: !!r.vestigios_peri,
+          inseticida: r.inseticida || null, qtde_inseticida: r.qtde_inseticida || 0,
+          num_pit: r.num_pit || null, notificacao: r.notificacao || null,
+          agente_saude: r.agente_saude || null, etiqueta: r.etiqueta || null, status: "Ativo"
         });
+        return;
       }
+      if (a === "Localidade" && mid && e.nome_localidade) {
+        await postJson("localidades", { municipio_id: mid, nome: e.nome_localidade, tipo: e.tipo_localidade || null, status: "Ativa" });
+        return;
+      }
+      if ((a === "Imóvel" || a === "Imóvel / vistoria") && lid) {
+        await postJson("imoveis", {
+          localidade_id: lid, identificacao: e.endereco || null, numero: e.numero || null,
+          tipo: e.tipo_imovel || null, situacao: e.situacao_imovel || null,
+          observacao: r.obs || null, ativo: true
+        });
+        return;
+      }
+      if (a === "Pesquisa entomológica" && lid) {
+        await postJson("pesquisas_entomologicas", {
+          localidade_id: lid, data_pesquisa: r.data || null, tipo_pesquisa: e.ambiente || null,
+          metodo: e.metodo || null, observacao: r.obs || null, status: "Ativo"
+        });
+        return;
+      }
+      if (a === "Captura" && lid) {
+        await postJson("capturas", {
+          localidade_id: lid, data_captura: r.data || null, especie: e.especie || null,
+          quantidade: n(e.quantidade) || 0, local_captura: e.ambiente || null,
+          observacao: r.obs || null, status: "Ativo"
+        });
+        return;
+      }
+      if (a === "Exame" && mid) {
+        await postJson("exames_pcdch", {
+          municipio_id: mid, localidade_id: lid, especie: e.tipo_exame || null,
+          resultado: e.resultado || null
+        });
+        return;
+      }
+      if (a === "PIT" && mid && lid) {
+        await postJson("pits_pcdch", {
+          municipio_id: mid, localidade_id: lid, numero_pit: n(e.num_pit) || 0,
+          nome: e.nome_pit || "PIT campo", ativo: true
+        });
+        return;
+      }
+      if (a === "Coleção hídrica" && lid) {
+        await postJson("colecoes_hidricas", {
+          localidade_id: lid, nome: e.tipo_criadouro || "Coleção", tipo: e.tipo_criadouro || null,
+          status: "Ativa", observacao: r.obs || e.resultado || null
+        });
+        return;
+      }
+      if (a === "Pesquisa malacológica" && lid) {
+        await postJson("pesquisas_malacologicas", {
+          localidade_id: lid, data_pesquisa: r.data || null, especie: e.especie || null,
+          moluscos_coletados: n(e.quantidade) || 0, observacao: r.obs || null, status: "Ativo"
+        });
+        return;
+      }
+      if (a === "PCE-101" && mid) {
+        await postJson("pce101_registros", {
+          estado_id: eid, municipio_id: mid, localidade_id: lid, data_coproscopia: r.data || null
+        });
+        return;
+      }
+      if (a === "PCE-108 / exame" && mid) {
+        await postJson("pce108_casos", {
+          estado_id: eid, municipio_id: mid, nome_paciente: e.nome_caso || null,
+          resultado_exame: e.resultado || null, data_exame: r.data || null
+        });
+        return;
+      }
+      if (a === "Educação em saúde" && r.programa === "PCE" && mid) {
+        await postJson("pce_atividades_educativas", { estado_id: eid, municipio_id: mid });
+        return;
+      }
+      if (a === "Saneamento" && mid) {
+        await postJson("pce_atividades_saneamento", { estado_id: eid, municipio_id: mid, localidade: r.localidade || null });
+        return;
+      }
+      if (a === "Caso humano LT" && mid) {
+        await postJson("pcl_lt_casos", { estado_id: eid, municipio_id: mid, nome: e.nome_caso || null, forma_clinica: e.forma || null, observacao: r.obs || null });
+        return;
+      }
+      if (a === "Investigação LT" && mid) {
+        await postJson("pcl_lt_investigacoes", { estado_id: eid, municipio_id: mid, data_investigacao: r.data || null, achados: e.conclusao || r.obs || null, status: "Ativo" });
+        return;
+      }
+      if (a === "Investigação LV" && mid) {
+        await postJson("pcl_lv_investigacoes", { estado_id: eid, municipio_id: mid, data_investigacao: r.data || null, achados: e.conclusao || r.obs || null, status: "Ativo" });
+        return;
+      }
+      if (a === "Entomologia LT" && mid) {
+        await postJson("pcl_lt_entomologia", { estado_id: eid, municipio_id: mid, data_coleta: r.data || null, ponto_coleta: e.ponto || null, resultado: e.resultado || null });
+        return;
+      }
+      if (a === "Entomologia LV" && mid) {
+        await postJson("pcl_lv_entomologia", { estado_id: eid, municipio_id: mid, data_coleta: r.data || null, ponto_coleta: e.ponto || null, resultado: e.resultado || null });
+        return;
+      }
+      if (a === "Inquérito canino" && mid) {
+        await postJson("pcl_lv_canina", { estado_id: eid, municipio_id: mid, nome_animal: e.identificacao_cao || null, data_coleta: r.data || null, resultado: e.resultado || null });
+        return;
+      }
+      if (a === "Ação LT" && mid) {
+        await postJson("pcl_lt_acoes", { estado_id: eid, municipio_id: mid, data_acao: r.data || null, tipo: e.tipo_acao || null, descricao: r.obs || e.produto || null });
+        return;
+      }
+      if (a === "Ação LV" && mid) {
+        await postJson("pcl_lv_acoes", { estado_id: eid, municipio_id: mid, data_acao: r.data || null, tipo: e.tipo_acao || null, descricao: r.obs || e.produto || null });
+        return;
+      }
+      if (a === "Óbito LV" && mid) {
+        await postJson("pcl_lv_obitos", { estado_id: eid, municipio_id: mid, nome: e.nome_caso || null, data_obito: e.data_obito || r.data || null });
+        return;
+      }
+    }
+
+    async function enviarUm(r) {
+      try { await enviarOficial(r); } catch (err) { throw new Error("Tabela oficial: " + err.message); }
       await postJson("endemiascampo_diario", {
         origem_id: r.id,
         data: r.data || null,
